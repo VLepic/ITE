@@ -1,0 +1,9 @@
+{
+  "WIFI_SSID": "",
+  "WIFI_PASSWORD": "",
+  "BROKER_IP":"",
+  "BROKER_PORT":1883,
+  "BROKER_USERNAME":"",
+  "BROKER_PASSWORD":"",
+  "TEAM_NAME":""
+}

@@ -4,6 +4,8 @@ services:
   mqtt_client:
     build: ./mqtt_client
     container_name: mqtt_client
+    environment:
+      - TZ=Europe/Prague
     #depends_on:
       #- influxdb
 

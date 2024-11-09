@@ -7,95 +7,166 @@ from umqtt.simple import MQTTClient
 from machine import Pin
 from ntptime import settime
 from time import localtime, mktime
-
-# Nastavení senzoru DHT22
-sensor = dht.DHT22(Pin(5))
-
 import ujson
+import json
 
-# Load Wi-Fi credentials from the JSON file
+# Sensor and MQTT configuration
+sensor = dht.DHT22(Pin(5))
+ledBlue = Pin(12, Pin.OUT)
+ledRed = Pin(4, Pin.OUT)
+ledGreen = Pin(14, Pin.OUT)
+
 with open("config/esp_8266_config.json") as f:
     secrets = ujson.load(f)
 
 SSID = secrets["WIFI_SSID"]
 PASSWORD = secrets["WIFI_PASSWORD"]
-
-# Nastavení MQTT
 BROKER_IP = secrets["BROKER_IP"]
 BROKER_PORT = secrets["BROKER_PORT"]
 BROKER_USERNAME = secrets["BROKER_USERNAME"]
 BROKER_PASSWORD = secrets["BROKER_PASSWORD"]
 TEAM_NAME = secrets["TEAM_NAME"]
+TIME_SYNC_INTERVAL = int(secrets["TIME_SYNC_INTERVAL"])
 TOPIC = f"ite/{TEAM_NAME}"
 
-# Připojení k Wi-Fi
+def setledcolor(R, G, B):
+    ledRed.value(R)
+    ledGreen.value(G)
+    ledBlue.value(B)
+
+# Connect to Wi-Fi
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     wlan.connect(SSID, PASSWORD)
     while not wlan.isconnected():
         time.sleep(1)
-    #print("Connected to Wi-Fi:", wlan.ifconfig())
 
-# Připojení k MQTT brokeru
+
+# Connect to MQTT broker
 def connect_mqtt():
     client_id = ubinascii.hexlify(machine.unique_id())
     client = MQTTClient(client_id, BROKER_IP, port=BROKER_PORT, user=BROKER_USERNAME, password=BROKER_PASSWORD)
-    client.connect()
-    #print("Connected to MQTT broker")
-    return client
+    try:
+        client.connect()
+        return client
+    except Exception as e:
+        print("Failed to connect to MQTT broker:", e)
+        return None
 
-# Získání aktuálního času s UTC+1 offsetem v požadovaném formátu
+
+# Get current timestamp with UTC+1 offset
 def get_timestamp():
-    settime()
-    now = mktime(localtime()) + 3600
+    now = mktime(localtime()) + 3600  # Add offset for UTC+1
     adjusted_time = localtime(now)
-    timestamp = "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}".format(*adjusted_time, 0)
-    return timestamp
+    return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}".format(*adjusted_time, 0)
 
-# Publikace dat na MQTT broker
+
+# Publish data to MQTT broker
 def publish_data(client, temperature, humidity=None):
-    timestamp = get_timestamp()
-    message = {
-        "team_name": TEAM_NAME,
-        "timestamp": timestamp,
-        "temperature": round(temperature, 2)
-    }
-    if humidity is not None:
-        message["humidity"] = round(humidity, 1)
-    payload = str(message).replace("'", "\"")  # Formátování na JSON-like string
-    client.publish(TOPIC, payload)
-    #print("Published message:", payload)
+    if client is None:
+        return False
+    try:
+        timestamp = get_timestamp()
+        message = {
+            "team_name": TEAM_NAME,
+            "timestamp": timestamp,
+            "temperature": float("{:.2f}".format(temperature))
+        }
+        if humidity is not None:
+            message["humidity"] = round(humidity, 1)
+        payload = json.dumps(message)
+        client.publish(TOPIC, payload)
+        print("Published:", payload)
+        return True
+    except Exception as e:
+        print("Error publishing data:", e)
+        return False
 
+
+# Main function
 def main():
+    setledcolor(1,0,0)
     connect_wifi()
+    print("Connected to Wi-Fi")
     client = connect_mqtt()
+    if client is not None:
+        print("Connected to MQTT broker")
+    settime()
     last_sync = time.time()
-
+    last_publish = time.time() - 60  # Publish immediately on start
+    setledcolor(0,1,0)
     try:
         while True:
-            # Periodically re-sync the time to avoid drift
-            if time.time() - last_sync > 3600:  # Re-sync every hour
-                settime()
-                last_sync = time.time()
-                #print("Time re-synchronized with NTP")
+            current_time = time.time()
 
+            # Check if it's time to publish
+            if current_time - last_publish >= 60:
+                setledcolor(0,0,1)
+                # Attempt to read sensor data
+                for attempt in range(3):
+                    try:
+                        sensor.measure()
+                        temperature = sensor.temperature()
+                        humidity = sensor.humidity()
+                        break
+                    except Exception as e:
+                        print(f"Error reading sensor data, attempt {attempt + 1}: {e}")
+                        setledcolor(1, 0, 0)
+                        time.sleep(1)
+                else:
+                    print("Failed to read sensor data after multiple attempts, skipping publish.")
+                    setledcolor(1, 0, 0)
+                    time.sleep(0.5)
+                    last_publish = current_time  # Skip to next interval
+                    continue
 
-            sensor.measure()
-            temperature = sensor.temperature()
-            humidity = sensor.humidity()
+                # Publish data and reconnect if needed
+                if not publish_data(client, temperature, humidity):
+                    print("Reconnecting to MQTT broker...")
+                    client = connect_mqtt()
+                    if client is not None:
+                        print("Reconnected to MQTT broker.")
 
-            publish_data(client, temperature, humidity)
-            time.sleep(60)
+                last_publish = current_time  # Update publish time after successful publish
+            # Sync time every X seconds
+            if current_time - last_sync > TIME_SYNC_INTERVAL:
+                setledcolor(0,1,1)
+                try:
+                    settime()
+                    last_sync = current_time
+                except Exception as e:
+                    print("Failed to sync time:", e)
+                    setledcolor(1, 0, 0)
+                    time.sleep(0.5)
+
+            time.sleep(0.1)
+            setledcolor(0, 1, 0)
+
 
     except KeyboardInterrupt:
-        print("Program ukončen")
+        print("Program stopped")
     finally:
-        client.disconnect()
-
-
-
+        if client is not None:
+            client.disconnect()
 main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

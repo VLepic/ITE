@@ -5,9 +5,11 @@ COPY mqtt_client.py /app/mqtt_client.py
 COPY mqtt_client_config.json /app/mqtt_client_config.json
 
 # Install Python packages
-RUN pip install hbmqtt websockets==8.1 paho-mqtt typing_extensions ujson
+RUN pip install hbmqtt websockets==8.1 paho-mqtt typing_extensions ujson influxdb_client
 
-CMD ["python", "mqtt_client.py"]
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 
 
 

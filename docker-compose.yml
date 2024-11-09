@@ -1,30 +1,58 @@
 version: '3'
 
 services:
+  influxdb:
+    image: influxdb:2.0
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - TZ=${TZ}
+      - DOCKER_INFLUXDB_INIT_MODE=${DOCKER_INFLUXDB_INIT_MODE}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${DOCKER_INFLUXDB_INIT_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    networks:
+      - app_network
+
   mqtt_client:
     build: ./mqtt_client
     container_name: mqtt_client
     environment:
-      - TZ=Europe/Prague
-    #depends_on:
-      #- influxdb
+      - TZ=${TZ}
+      - TEAM_NAME=${TEAM_NAME}
+      - BROKER_IP=${BROKER_IP}
+      - BROKER_PORT=${BROKER_PORT}
+      - BROKER_USERNAME=${BROKER_USERNAME}
+      - BROKER_PASSWORD=${BROKER_PASSWORD}
+      - INFLUXDB_URL=${INFLUXDB_URL}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+    entrypoint: ./entrypoint.sh
+    volumes:
+      - ./mqtt_client:/app
+    depends_on:
+      - influxdb
+    networks:
+      - app_network
 
-  #influxdb:
-    #image: influxdb:2.0
-    #container_name: influxdb
-    #ports:
-      #- "8086:8086"
-    #environment:
-      #- DOCKER_INFLUXDB_INIT_MODE=setup
-      #- DOCKER_INFLUXDB_INIT_USERNAME=admin
-      #- DOCKER_INFLUXDB_INIT_PASSWORD=supersecretpassword
-      #- DOCKER_INFLUXDB_INIT_ORG=myorg
-      #- DOCKER_INFLUXDB_INIT_BUCKET=mybucket
-      #- DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=mytoken
-    #volumes:
-      #- influxdb-data:/var/lib/influxdb2
+networks:
+  app_network:
+    driver: bridge
 
-#volumes:
-  #influxdb-data:
+volumes:
+  influxdb-data:
+
+
+
+
+
 
 

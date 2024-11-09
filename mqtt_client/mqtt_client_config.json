@@ -1,13 +1,12 @@
 {
   "TEAM_NAME": "",
   "BROKER_IP": "",
-  "BROKER_PORT": 1883,
+  "BROKER_PORT": ,
   "BROKER_USERNAME": "",
   "BROKER_PASSWORD": "",
-  "INFLUXDB_URL":"",
+  "INFLUXDB_URL": "",
+  "INFLUXDB_TOKEN": "",
   "INFLUXDB_ORG": "",
   "INFLUXDB_BUCKET": "",
-  "INFLUXDB_TOKEN": ""
-
+  "LOGGING_LEVEL": ""
 }
-

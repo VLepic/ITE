@@ -1,6 +1,27 @@
 version: '3'
 
 services:
+  api_server:
+    build: ./api_server
+    container_name: api_server
+    ports:
+      - "5000:5000"
+    environment:
+      - TZ=${TZ}
+      - TEAM_NAME=${TEAM_NAME}
+      - INFLUXDB_URL=${INFLUXDB_URL}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+    volumes:
+      - ./api_server:/app
+    depends_on:
+      - influxdb
+    networks:
+      - app_network
+
   influxdb:
     image: influxdb:2.0
     container_name: influxdb
@@ -49,7 +70,6 @@ networks:
 
 volumes:
   influxdb-data:
-
 
 
 

@@ -62,8 +62,6 @@ def on_message(client, userdata, msg):
         payload = json.loads(msg.payload.decode())
         logger.debug(f"Raw payload received: {payload}")
 
-        timestamp = payload.get("timestamp", datetime.utcnow().isoformat())
-
         # Log the received message details
         logger.info(f"Received message from team '{str(payload['team_name'])}' on topic {msg.topic}: {payload}")
 
@@ -79,17 +77,27 @@ def on_message(client, userdata, msg):
         )
 
         if 'temperature' in payload:
-            point = point.field("temperature", float(payload['temperature']))  # Adding temperature field
-            logger.info(f"Temperature: {float(payload['temperature'])}%")
-        if 'humidity' in payload:
-            point = point.field("humidity", float(payload['humidity']))  # Adding temperature field
-            logger.info(f"Humidity: {float(payload['humidity'])}%")
-        if 'illumination' in payload:
-            point = point.field("illumination", float(payload['illumination']))  # Adding humidity field
-            logger.info(f"Illumination: {float(payload['illumination'])}%")
+            temperature_point = point.field("value", round(float(payload['temperature']), 2))
+            temperature_point = temperature_point.field("datetime", payload['timestamp'])
+            temperature_point = temperature_point.tag("sensor", "temperature")
+            write_api.write(INFLUXDB_BUCKET, INFLUXDB_ORG, temperature_point)
+            logger.info(f"Temperature: {round(float(payload['temperature']), 2)}°C")
 
-        # Write the point to InfluxDB
-        write_api.write(INFLUXDB_BUCKET, INFLUXDB_ORG, point)
+        if 'humidity' in payload:
+            humidity_point = point.field("value", round(float(payload['humidity']), 1))
+            humidity_point = humidity_point.field("datetime", payload['timestamp'])
+            humidity_point = humidity_point.tag("sensor", "humidity")
+            write_api.write(INFLUXDB_BUCKET, INFLUXDB_ORG, humidity_point)
+            logger.info(f"Humidity: {round(float(payload['humidity']), 1)}%")
+
+        if 'illumination' in payload:
+            illumination_point = point.field("value", round(float(payload['illumination']), 1))
+            illumination_point = illumination_point.field("datetime", payload['timestamp'])
+            illumination_point = illumination_point.tag("sensor", "illumination")
+            write_api.write(INFLUXDB_BUCKET, INFLUXDB_ORG, illumination_point)
+            logger.info(f"Illumination: {round(float(payload['illumination']), 1)} lux")
+
+
         logger.info("Data written to InfluxDB successfully.")
 
     except json.JSONDecodeError:

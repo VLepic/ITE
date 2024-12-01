@@ -22,7 +22,7 @@ EXPOSE 5000
 COPY approutes /app/approutes
 
 # Run Gunicorn with 6 workers
-CMD ["gunicorn", "-k", "eventlet", "-w", "6", "--bind", "0.0.0.0:5000", "main:app"]
+CMD ["gunicorn", "-k", "eventlet", "-w", "1", "--bind", "0.0.0.0:5000", "main:app"]
 
 
 

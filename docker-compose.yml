@@ -1,6 +1,22 @@
 version: '3'
 
 services:
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+    environment:
+      - TIMEZONE=${TZ}
+      - UPTIME_KUMA_USERNAME=${UPTIME_KUMA_USERNAME}
+      - UPTIME_KUMA_PASSWORD=${UPTIME_KUMA_PASSWORD}
+    restart: unless-stopped
+    networks:
+        - app_network
+
   api_server:
     build: ./api_server
     container_name: api_server
@@ -9,8 +25,7 @@ services:
     environment:
       - TZ=${TZ}
       - TEAM_NAME=${TEAM_NAME}
-      - INFLUXDB_URL=${INFLUXDB_URL}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN=${DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN}
       - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
       - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
@@ -35,10 +50,14 @@ services:
       - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
       - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - DOCKER_INFLUXDB_INIT_MQTT_CLIENT_TOKEN=${DOCKER_INFLUXDB_INIT_MQTT_CLIENT_TOKEN}
+      - DOCKER_INFLUXDB_INIT_GRAFANA_TOKEN=${DOCKER_INFLUXDB_INIT_GRAFANA_TOKEN}
+      - DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN=${DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN}
     volumes:
       - influxdb-data:/var/lib/influxdb2
     networks:
       - app_network
+
 
   mqtt_client:
     build: ./mqtt_client
@@ -50,15 +69,80 @@ services:
       - BROKER_PORT=${BROKER_PORT}
       - BROKER_USERNAME=${BROKER_USERNAME}
       - BROKER_PASSWORD=${BROKER_PASSWORD}
-      - INFLUXDB_URL=${INFLUXDB_URL}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
       - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
       - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
-      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - DOCKER_INFLUXDB_INIT_MQTT_CLIENT_TOKEN=${DOCKER_INFLUXDB_INIT_MQTT_CLIENT_TOKEN}
+      - BASE_URL=${BASE_URL}
+      - AIMTEC_USERNAME=${AIMTEC_USERNAME}
+      - AIMTEC_PASSWORD=${AIMTEC_PASSWORD}
+      - sensorUUID_TEMPERATURE=${sensorUUID_TEMPERATURE}
+      - sensorUUID_HUMIDITY=${sensorUUID_HUMIDITY}
+      - sensorUUID_ILLUMINATION=${sensorUUID_ILLUMINATION}
       - LOGGING_LEVEL=${LOGGING_LEVEL}
     entrypoint: ./entrypoint.sh
     volumes:
       - ./mqtt_client:/app
+    depends_on:
+      - influxdb
+    networks:
+      - app_network
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_proxy
+    ports:
+      - "80:80"       # Expose port 80 for HTTP
+      - "443:443"     # Expose port 443 for HTTPS
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - certs:/etc/letsencrypt  # Certificates for HTTPS
+      - ./webroot:/var/www/html  # Shared folder for HTTP-01 challenge
+
+    depends_on:
+      - api_server
+      - certbot
+    networks:
+      - app_network
+
+  certbot:
+      image: certbot/certbot
+      container_name: certbot
+      volumes:
+        - certs:/etc/letsencrypt  # Shared volume for certificates
+        - ./webroot:/var/www/html  # Folder for HTTP-01 challenge
+      entrypoint: >
+        sh -c "
+        certbot certonly
+        --webroot
+        -w /var/www/html
+        -d sulis104.zcu.cz
+        --non-interactive
+        --agree-tos
+        --email vlepic@students.zcu.cz
+        && trap exit TERM;
+        while :; do sleep 12h & wait $!; done"
+      restart: always
+      networks:
+        - app_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - '3000:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_GRAFANA_TOKEN=${DOCKER_INFLUXDB_INIT_GRAFANA_TOKEN}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - GF_USERS_ALLOW_SIGN_UP=${GF_USERS_ALLOW_SIGN_UP}
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
+      - ./grafana/grafana_startup.sh:/grafana_startup.sh
+    entrypoint: [ "/bin/bash", "/grafana_startup.sh" ]
     depends_on:
       - influxdb
     networks:
@@ -70,6 +154,13 @@ networks:
 
 volumes:
   influxdb-data:
+  certs:  # Shared volume for Certbot and NGINX
+  webroot:
+    driver: local
+  grafana-storage:
+    driver: local
+  uptime-kuma-data:
+    driver: local
 
 
 

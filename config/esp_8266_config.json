@@ -1,10 +1,11 @@
-{ //ESP8266 Configuration File
+{
   "TEAM_NAME":"",
   "WIFI_SSID": "",
   "WIFI_PASSWORD": "",
   "BROKER_IP":"",
-  "BROKER_PORT":,
+  "BROKER_PORT":1883,
   "BROKER_USERNAME":"",
   "BROKER_PASSWORD":"",
-  "TIME_SYNC_INTERVAL":
+  "TIME_SYNC_INTERVAL": 86400,
+  "QUEUE_LENGTH": 10
 }

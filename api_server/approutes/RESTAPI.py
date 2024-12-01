@@ -14,7 +14,7 @@ def RESTAPI_route(app):
     @app.route('/<team_name>/<measurement>', methods=['GET'])
     def get_data(team_name, measurement):
         INFLUXDB_URL = "http://influxdb:8086"
-        INFLUXDB_TOKEN = os.environ.get('DOCKER_INFLUXDB_INIT_ADMIN_TOKEN', 'default-influxdb-token')
+        INFLUXDB_TOKEN = os.environ.get('DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN', 'default-influxdb-token')
         ORG = os.environ.get('DOCKER_INFLUXDB_INIT_ORG', 'default-influxdb-org')
         BUCKET = os.environ.get('DOCKER_INFLUXDB_INIT_BUCKET', 'default-influxdb-bucket')
         field = "value"
@@ -51,7 +51,7 @@ def latest_RESTAPI_route(app):
     @app.route('/<team_name>/<measurement>/latest', methods=['GET'])
     def get_latest_data(team_name, measurement):
         INFLUXDB_URL = "http://influxdb:8086"
-        INFLUXDB_TOKEN = os.environ.get('DOCKER_INFLUXDB_INIT_ADMIN_TOKEN', 'default-influxdb-token')
+        INFLUXDB_TOKEN = os.environ.get('DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN', 'default-influxdb-token')
         ORG = os.environ.get('DOCKER_INFLUXDB_INIT_ORG', 'default-influxdb-org')
         BUCKET = os.environ.get('DOCKER_INFLUXDB_INIT_BUCKET', 'default-influxdb-bucket')
         field = "value"

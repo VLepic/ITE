@@ -1,21 +1,44 @@
 import time
+
 import dht
 import machine
-import network
-import ubinascii
+from machine import Pin, I2C, RTC
+from utime import sleep
+from bh1750 import BH1750
 from umqtt.simple import MQTTClient
-from machine import Pin
-from ntptime import settime
+import ntptime
 from time import localtime, mktime
+import ubinascii
 import ujson
-import json
+import os
+from collections import deque
+from ds3231 import DS3231
 
-# Sensor and MQTT configuration
-sensor = dht.DHT22(Pin(5))
-ledBlue = Pin(12, Pin.OUT)
-ledRed = Pin(4, Pin.OUT)
-ledGreen = Pin(14, Pin.OUT)
+# Initialize sensors and pins
+sensor = dht.DHT22(Pin(5))  # DHT22 sensor on GPIO5
+ledBlue = Pin(12, Pin.OUT)  # Blue LED on GPIO12
+ledRed = Pin(2, Pin.OUT)  # Red LED on GPIO2
+ledGreen = Pin(14, Pin.OUT)  # Green LED on GPIO14
 
+rtc = RTC()  # Internal RTC
+
+# I2C for BH1750 and DS3231: GPIO4 (SCL), GPIO13 (SDA)
+try:
+    i2c = I2C(scl=Pin(13), sda=Pin(4))
+    devices = i2c.scan()
+    if devices:
+        print("I²C devices found at addresses:", [hex(device) for device in devices])
+    else:
+        print("No I²C devices found.")
+    light_sensor = BH1750(i2c)
+    rtc_ds = DS3231(i2c)  # RTC initialization
+    print("BH1750 and DS3231 initialized successfully.")
+except Exception as e:
+    print(f"I²C device initialization error: {e}")
+    light_sensor = None  # Continue without BH1750 if unavailable
+    rtc_ds = None  # Continue without RTC if unavailable
+
+# Load configuration
 with open("config/esp_8266_config.json") as f:
     secrets = ujson.load(f)
 
@@ -26,151 +49,312 @@ BROKER_PORT = secrets["BROKER_PORT"]
 BROKER_USERNAME = secrets["BROKER_USERNAME"]
 BROKER_PASSWORD = secrets["BROKER_PASSWORD"]
 TEAM_NAME = secrets["TEAM_NAME"]
-TIME_SYNC_INTERVAL = int(secrets["TIME_SYNC_INTERVAL"])
+TIME_SYNC_INTERVAL = int(secrets["TIME_SYNC_INTERVAL"])  # RTC synchronization interval in seconds
+QUEUE_LENGTH = int(secrets["QUEUE_LENGTH"])  # Length of RAM queue
 TOPIC = f"ite/{TEAM_NAME}"
+PAYLOAD_FILE = "payload_queue.json"
+
+ram_queue_full = False  # Tracks if the RAM queue is full
+
+# Load payload queue from file if it exists
+if PAYLOAD_FILE in os.listdir():
+    with open(PAYLOAD_FILE, "r") as f:
+        try:
+            payload_file_queue = ujson.load(f)
+        except ValueError:
+            payload_file_queue = []
+else:
+    payload_file_queue = []
+
+payload_queue = deque([], QUEUE_LENGTH)  # RAM queue
 
 def setledcolor(R, G, B):
+    """Set LED color using RGB values."""
     ledRed.value(R)
     ledGreen.value(G)
     ledBlue.value(B)
 
-# Connect to Wi-Fi
-def connect_wifi():
-    wlan = network.WLAN(network.STA_IF)
+def save_payloads_to_file():
+    """Save the entire RAM queue to the file queue."""
+    with open(PAYLOAD_FILE, "w") as f:
+        ujson.dump(list(payload_queue), f)
+
+def save_payload_to_file(payload):
+    """Append a single payload to the file queue."""
+    try:
+        file_queue = []
+        if PAYLOAD_FILE in os.listdir():
+            with open(PAYLOAD_FILE, "r") as f:
+                file_queue = ujson.load(f)
+
+        file_queue.append(payload)
+
+        with open(PAYLOAD_FILE, "w") as f:
+            ujson.dump(file_queue, f)
+        print("Saved payload to file queue:", payload)
+    except Exception as e:
+        print("Error saving payload to file:", e)
+
+def save_ram_queue_to_file():
+    """Save all RAM queue items to the file queue."""
+    try:
+        file_queue = []
+        if PAYLOAD_FILE in os.listdir():
+            with open(PAYLOAD_FILE, "r") as f:
+                file_queue = ujson.load(f)
+
+        # Append all items in the RAM queue to the file queue
+        file_queue.extend(list(payload_queue))
+
+        with open(PAYLOAD_FILE, "w") as f:
+            ujson.dump(file_queue, f)
+
+        print(f"Saved RAM queue ({len(payload_queue)}) to file.")
+    except Exception as e:
+        print("Error saving RAM queue to file:", e)
+
+def connect_wifi(timeout=30):
+    """Connect to Wi-Fi within a specified timeout period."""
+    from network import WLAN, STA_IF
+    wlan = WLAN(STA_IF)
     wlan.active(True)
     wlan.connect(SSID, PASSWORD)
+    start_time = time.time()
+
     while not wlan.isconnected():
+        if time.time() - start_time > timeout:
+            print("Wi-Fi connection failed. Proceeding in offline mode.")
+            return False  # Connection failed
         time.sleep(1)
 
+    print("Wi-Fi connected:", wlan.ifconfig())
+    return True  # Connection successful
 
-# Connect to MQTT broker
+def get_time():
+    """Get the current time from RTC or fallback to internal ESP time."""
+    try:
+        now = rtc_ds.datetime()  # Get time from RTC
+        print("RTC Time (UTC):", now)
+        return now
+    except Exception as e:
+        print("RTC unavailable, using internal ESP time:", e)
+        return localtime()  # Fallback to ESP time
+
 def connect_mqtt():
+    """Connect to the MQTT broker."""
     client_id = ubinascii.hexlify(machine.unique_id())
     client = MQTTClient(client_id, BROKER_IP, port=BROKER_PORT, user=BROKER_USERNAME, password=BROKER_PASSWORD)
     try:
         client.connect()
         return client
     except Exception as e:
-        print("Failed to connect to MQTT broker:", e)
+        print("MQTT connection error:", e)
+        return None
+
+def sync_rtc_with_ntp():
+    """Synchronize the RTC with an NTP server (UTC)."""
+    if rtc_ds:
+        try:
+            ntptime.settime()  # Sync ESP time with NTP
+            now = localtime()  # Get current UTC time
+
+            # Adjust the time to remove unwanted offsets if necessary
+            adjusted_time = mktime(now)
+            adjusted_time_tuple = localtime(adjusted_time)
+
+            # Set RTC to the adjusted time
+            rtc_ds.datetime((
+                adjusted_time_tuple[0],  # Year
+                adjusted_time_tuple[1],  # Month
+                adjusted_time_tuple[2],  # Day
+                adjusted_time_tuple[3],  # Weekday
+                adjusted_time_tuple[4],  # Hour
+                adjusted_time_tuple[5],  # Minute
+                adjusted_time_tuple[6],  # Second
+                0  # Subsecond (not used)
+            ))
+
+            print("RTC synchronized with adjusted NTP time:", rtc_ds.datetime())
+        except Exception as e:
+            print("Error synchronizing RTC with NTP:", e)
+
+def get_timestamp():
+    """Generate ISO 8601 timestamp from RTC or fallback to ESP time."""
+    time_tuple = get_time()  # Get current time
+    if isinstance(time_tuple, tuple):  # Check if valid time tuple
+        return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.000000".format(
+            time_tuple[0], time_tuple[1], time_tuple[2],
+            time_tuple[4], time_tuple[5], time_tuple[6])
+    return "1970-01-01T00:00:00.000000"  # Default timestamp fallback
+
+
+def debug_time():
+    """Debug function to display current RTC and ESP internal times."""
+    try:
+        print("RTC Time (UTC):", rtc_ds.datetime())
+    except Exception as e:
+        print("RTC unavailable:", e)
+    print("ESP Internal Time:", localtime())
+    print("Generated Timestamp:", get_timestamp())
+
+
+def get_rtc_unix_time():
+    try:
+        rtc_time = rtc_ds.datetime()  # Get the RTC time
+        # RTC returns (year, month, day, weekday, hour, minute, second, subsecond)
+        # mktime expects (year, month, day, hour, minute, second, weekday, yearday)
+
+        weekday = (rtc_time[3] - 1) % 7
+
+        # Create tuple in mktime's format
+        time_tuple = (rtc_time[0], rtc_time[1], rtc_time[2],  # year, month, day
+                      rtc_time[4], rtc_time[5], rtc_time[6],  # hour, minute, second
+                      weekday, 0)  # weekday, yearday (yearday not used)
+
+        # Convert to Unix timestamp
+        unix_time = mktime(time_tuple)
+        return unix_time
+    except Exception as e:
+        print("Error fetching RTC Unix time:", e)
         return None
 
 
-# Get current timestamp with UTC+1 offset
-def get_timestamp():
-    now = mktime(localtime()) + 3600  # Add offset for UTC+1
-    adjusted_time = localtime(now)
-    return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}".format(*adjusted_time, 0)
+def publish_data(client, temperature=None, humidity=None, illumination=None, timestamp=None):
+    global ram_queue_full, payload_queue
 
+    # Construct the payload
+    message = {
+        "team_name": TEAM_NAME,
+        "timestamp": timestamp,
+    }
+    if temperature is not None:
+        message["temperature"] = float("{:.2f}".format(temperature))
+    if humidity is not None:
+        message["humidity"] = round(humidity, 1)
+    if illumination is not None:
+        message["illumination"] = round(illumination, 1)
 
-# Publish data to MQTT broker
-def publish_data(client, temperature, humidity=None):
+    payload = ujson.dumps(message)
+
+    # Handle disconnected MQTT client
     if client is None:
+        if not ram_queue_full:
+            payload_queue.append(payload)  # Queue in RAM
+            print("Queued payload to RAM:", payload)
+
+            if len(payload_queue) >= QUEUE_LENGTH:
+                save_ram_queue_to_file()  # Save RAM queue to file
+                payload_queue = deque([], QUEUE_LENGTH)  # Reset RAM queue
+                ram_queue_full = True
+                print("RAM queue full. Switching to file-based queue.")
+        else:
+            save_payload_to_file(payload)  # Save directly to file if RAM queue is full
+            print("Saved payload directly to file queue:", payload)
         return False
+
     try:
-        timestamp = get_timestamp()
-        message = {
-            "team_name": TEAM_NAME,
-            "timestamp": timestamp,
-            "temperature": float("{:.2f}".format(temperature))
-        }
-        if humidity is not None:
-            message["humidity"] = round(humidity, 1)
-        payload = json.dumps(message)
+        # Publish any queued payloads from file
+        while payload_file_queue:
+            queued_payload = payload_file_queue.pop(0)
+            client.publish(TOPIC, queued_payload)
+            print("Published queued payload from file:", queued_payload)
+        save_payloads_to_file()  # Save updated file queue
+
+        # Publish any queued payloads from RAM
+        while payload_queue:
+            queued_payload = payload_queue.popleft()
+            client.publish(TOPIC, queued_payload)
+            print("Published queued payload from RAM:", queued_payload)
+
+        # Publish the current payload
         client.publish(TOPIC, payload)
         print("Published:", payload)
         return True
     except Exception as e:
         print("Error publishing data:", e)
+        if not ram_queue_full:
+            payload_queue.append(payload)  # Requeue in RAM
+            print("Queued payload to RAM:", payload)
+        else:
+            save_payload_to_file(payload)  # Save directly to file
+            print("Saved payload directly to file queue:", payload)
         return False
 
 
-# Main function
 def main():
-    setledcolor(1,0,0)
-    connect_wifi()
-    print("Connected to Wi-Fi")
+    setledcolor(1, 0, 0)
+    if not connect_wifi():
+        print("Operating in offline mode.")
+    else:
+        print("Wi-Fi connected successfully.")
+
     client = connect_mqtt()
     if client is not None:
-        print("Connected to MQTT broker")
-    settime()
-    last_sync = time.time()
-    last_publish = time.time() - 60  # Publish immediately on start
-    setledcolor(0,1,0)
+        print("Connected to MQTT broker.")
+
+    sync_rtc_with_ntp()  # Synchronize RTC with NTP
+    last_sync = get_rtc_unix_time()
+
+    # Initial measurement time
+    planned_measurement_time = get_rtc_unix_time()  # Trigger first measurement immediately
+    setledcolor(0, 1, 0)
+
     try:
         while True:
-            current_time = time.time()
+            # Get the current time
+            current_time = get_rtc_unix_time()
 
-            # Check if it's time to publish
-            if current_time - last_publish >= 60:
-                setledcolor(0,0,1)
-                # Attempt to read sensor data
-                for attempt in range(3):
-                    try:
-                        sensor.measure()
-                        temperature = sensor.temperature()
-                        humidity = sensor.humidity()
-                        break
-                    except Exception as e:
-                        print(f"Error reading sensor data, attempt {attempt + 1}: {e}")
-                        setledcolor(1, 0, 0)
-                        time.sleep(1)
-                else:
-                    print("Failed to read sensor data after multiple attempts, skipping publish.")
-                    setledcolor(1, 0, 0)
-                    time.sleep(0.5)
-                    last_publish = current_time  # Skip to next interval
-                    continue
+            # Check if it's time to measure and publish data
+            if current_time >= planned_measurement_time:
+                setledcolor(0, 0, 1)  # Blue LED indicates data collection
+                planned_measurement_time += 60  # Schedule next measurement
+                timestamp = get_timestamp()
 
-                # Publish data and reconnect if needed
-                if not publish_data(client, temperature, humidity):
-                    print("Reconnecting to MQTT broker...")
-                    client = connect_mqtt()
-                    if client is not None:
-                        print("Reconnected to MQTT broker.")
-
-                last_publish = current_time  # Update publish time after successful publish
-            # Sync time every X seconds
-            if current_time - last_sync > TIME_SYNC_INTERVAL:
-                setledcolor(0,1,1)
+                # Collect sensor data
+                temperature, humidity, illumination = None, None, None
                 try:
-                    settime()
+                    sensor.measure()
+                    temperature = sensor.temperature()
+                    humidity = sensor.humidity()
+                except Exception as e:
+                    print("Error reading DHT22 sensor:", e)
+
+                try:
+                    illumination = light_sensor.luminance(BH1750.CONT_HIRES_1)
+                except Exception as e:
+                    print("Error reading BH1750 sensor:", e)
+
+                # Publish the data
+                if any([temperature, humidity, illumination]):
+                    if not publish_data(client, temperature, humidity, illumination, timestamp):
+                        print("Reconnecting to MQTT broker...")
+                        client = connect_mqtt()
+                        if client is not None:
+                            print("Reconnected to MQTT broker.")
+                else:
+                    print("No data available to publish.")
+
+            # Daily RTC synchronization
+            if current_time - last_sync >= TIME_SYNC_INTERVAL:
+                setledcolor(0, 1, 1)
+                try:
+                    sync_rtc_with_ntp()
                     last_sync = current_time
                 except Exception as e:
-                    print("Failed to sync time:", e)
-                    setledcolor(1, 0, 0)
-                    time.sleep(0.5)
+                    print("Error during RTC synchronization:", e)
 
             time.sleep(0.1)
-            setledcolor(0, 1, 0)
-
+            setledcolor(0, 1, 0)  # Green LED indicates idle state
 
     except KeyboardInterrupt:
-        print("Program stopped")
+        print("Program terminated.")
     finally:
         if client is not None:
             client.disconnect()
+
+
+# Start the main function
 main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

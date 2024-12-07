@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+    <title>
+        ITE Dashboard
+    </title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Funnel+Sans:ital,wght@0,300..800;1,300..800&family=Megrim&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+</head>
+
+<body>
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+    <script type="text/javascript" src="main_.js"></script>
+    <script src="alert_handler.js"></script>
+    
+    <!-- <div class="canvas" id="particles-js"></div> -->
+    <!-- <header>
+        <h1 id="header-text">Dashboard</h1>
+    </header>
+
+    <main>
+
+        <div class="box">
+            <h1 id="temperature" class="value">Awaiting data...</h1>
+        </div>
+        <div class="box">
+            <h1 id="humidity" class="value">Awaiting data...</h1>
+        </div>
+
+    </main> -->
+
+
+    <header>
+        <div id="header" class="panel text_field" style="border-right: none;">
+            <h1 style="left: 10px; position: relative; transform: translateY(-50%); top: 50%;" class="megrim-regular" >Dashboard</h1>
+        </div>
+        <div id="user" class="panel text_field" style="border-right: none;">
+            <!-- <p>Signed in user</p> -->
+            
+        </div>
+        <div id="screenmode" class="panel">
+            <!-- <label class="switch">
+                <input id="mode_switch" type="checkbox" autocomplete="off">
+                <span class="slider"></span>
+            </label> -->
+            
+            <button id="switch" >
+                <img id="sun" src="sun.png" />
+                <img id="moon" src="moon.png" />
+            </button>
+
+
+        </div>
+    </header>
+
+    <main>
+
+        <div id="left_panel" class="panel" style="border-top: none;">
+            <select name="teams" id="teams" class="panel" >
+                <option value="pink">Team Pink</option>
+                <option value="yellow">Team Yellow</option>
+                <option value="green">Team Green</option>
+                <option value="red">Team Red</option>
+                <option value="blue">Team Blue</option>
+                <option value="black">Team Black</option>
+            </select>
+
+
+            <div id="infotab" class="text_field">
+                
+                <div id="infotab_temperature">
+                    <br style="height: 5px;">
+                    <div class="panel">
+                        <div class="data" id="_temperature" >
+                            <h3 id="temperature">Awaiting data...</h3>
+                            <img src="sipka.png" class="sipka">
+                        </div>
+                        
+                        <div id="temp_chart" class="dataframe">
+                            <!-- <input class="dial" type="number" id="temp_max" value="0"> -->
+                        </div>
+                    </div>
+                </div>
+                
+
+                <div id="infotab_humidity">
+                    <br style="height: 5px;">
+                    <div class="panel" >
+                        <div class="data" id="_humidity">
+                            <h3 id="humidity">Awaiting data...</h3>
+                            <img src="sipka.png" class="sipka">
+                        </div>
+                        
+                        <div id="temp_chart" class="dataframe"></div>
+                    </div>
+                </div>
+                
+
+                <div id="infotab_illumination">
+                    <br style="height: 5px;">
+                    <div class="panel" >
+                        <div class="data" id="_illumination">
+                            <h3 id="illumination">Awaiting data...</h3>
+                            <img src="sipka.png" class="sipka">
+                        </div>
+                        
+                        <div id="temp_chart" class="dataframe"></div>
+                    </div>
+                </div>
+                
+
+
+            </div>
+
+            <div style="display: inline;">
+                <a id="grafana" href="https://ite-grafana.vaclavlepic.com/?orgId=1&from=now-6h&to=now&timezone=browser" target="_blank"> 
+                    <p style="margin: auto; position: absolute; top: 50%; 
+                        transform: translate( -50% ,-50%);
+                        left: 50%;
+                        text-wrap: nowrap;">
+                        Detailní zobrazení.
+                    </p> 
+                </a>
+            </div>
+            
+            
+            
+        </div>
+
+
+        <div id="right_panel">
+            
+
+            <!-- <div id="list" class="panel">
+                <button>Team Pink</button>
+                <button>Team Blue</button>
+                <button>Team Blue</button>
+            </div> -->
+
+            <div id="visualiser" class="panel">
+                <!-- <svg viewBox="200 400">
+                    <rect x="0" y="0" width="400" height="400"></rect>
+                </svg> -->
+                <div id="tree">
+                    <div id="inner_container">
+                        <img id="humidity_img" src="hum.png" alt=""> 
+                        <img id="illumination_img" src="illum.png" alt="">
+                        <img id="temperature_img" src="temp.png" alt="">
+                        <img src="board.png" alt="" srcset="">
+
+                    </div>
+                    <div id="sensor_info">
+                        <div id="board">
+                            <p>NodeMCU ESP 8266</p>
+                            <li id="board_date" >datum</li>
+                        </div>
+                        <div id="temp">
+                            <p >Senzor teploty DS18B20</p>
+                            <li id="temp_date" >datum</li>
+                        </div>
+                        <div id="illum">
+                            <p >Senzor intenzity osvětlení BH1750</p>
+                            <li id="illum_date" >datum</li>
+                        </div>
+                        <div id="hum">
+                            <p >Senzor teploty a vlhkosti DHT11</p>
+                            <li id="hum_date" >datum</li>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer class="panel text_field">
+        <p>Last update: <span id="timestamp"></span> </p>
+    </footer>
+
+
+    <!-- <script src="https://github.com/imhvost/chart-utils/blob/master/dist/chart-utils.min.js"></script> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="charts.js"></script> -->
+    
+    
+
+</body>
+
+</html>

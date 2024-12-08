@@ -208,7 +208,7 @@ async function team_change() {
         // console.log(data);
         return data
     }).then( async function(meta){
-        console.log(meta)
+        // console.log(meta)
 
         const sensorInfo = document.getElementById("sensor_info")
 
@@ -222,7 +222,7 @@ async function team_change() {
                 // console.log(response.json())
                 return response.json();
             }).then(function(data) { 
-                console.log(data)
+                // console.log(data)
                 // console.log(Object.keys(data))
                 // console.log(Object.values(data))
 
@@ -458,42 +458,69 @@ async function make_chart(wrapper , type = "temperature"){
 
 
     if(teamName == "pink"){
-        url = `https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/getboundaries/${type}?login=${teamName}&password=dAjiekfK03LFGdeHW6SJ`
-        let alerts 
-        await fetch(url).then(function(response) {
-            return response.json();
-        }).then(function(data) {
-            // console.log(data);
-            alerts = data
-        }).catch(function(err) {
-            console.log('Fetch Error :-S', err);
-        });
 
-        wrapper.innerHTML = wrapper.innerHTML.concat(`
-            <p>Limity upozornění:</p>
-            <span style="display : inline-block;" >
-                <p>Max: <input class="dial" type="number" id="max" value="${alerts.highValue}"> </p>
-                <p>Min: <input class="dial" type="number" id="min" value="${alerts.lowValue}"> </p>
-                <button style="margin-top:10px; margin-left:10px" id="submit" >Nastavit</button>
-            </span>
+        async function get_alerts(){
+            url = `https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/getboundaries/${type}`
+            let alerts 
+            await fetch(url).then(function(response) {
+                return response.json();
+            }).then(function(data) {
+                // console.log(data);
+                alerts = data
+            }).catch(function(err) {
+                console.log('Fetch Error :-S', err);
+            });
+            return alerts
+        }
+
+        await get_alerts().then( function(alerts) {
+
+
+            wrapper.innerHTML = wrapper.innerHTML.concat(`
+                <p>Limity upozornění:</p>
+                <span style="display : inline-block;" >
+                    <p>Max: <input class="dial" type="number" id="max" value="${alerts.highValue}"> </p>
+                    <p>Min: <input class="dial" type="number" id="min" value="${alerts.lowValue}"> </p>
+                    <p>Heslo: <input class="dial" type="password" id="pass" value=""> </p>
+                    <button style="margin-top:10px; margin-left:10px" id="submit" >Nastavit</button>
+                </span>
+                
+                <br>
+                `)
             
-            <br>
-            `)
-        
-        wrapper.querySelector("#submit").addEventListener("click" , async function(){
-            // console.log("press")
-            const high = wrapper.querySelector("#max").value
-            const low = wrapper.querySelector("#min").value
-            await fetch(`https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/changeboundaries/temperature?login=pink&password=dAjiekfK03LFGdeHW6SJ&min_value=${low}&max_value=${high}`, { 
-                method: 'PUT', 
-                headers: { 
-                  'Content-type': 'application/json'
-                }, 
-              }); 
+            wrapper.querySelector("#submit").addEventListener("click" , async function(){
+    
+                // console.log("press")
+                const high = wrapper.querySelector("#max").value
+                const low = wrapper.querySelector("#min").value
+                const pass = wrapper.querySelector("#pass").value
+    
+                await fetch(`https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/changeboundaries/temperature?login=pink&password=${pass}&min_value=${low}&max_value=${high}`, { 
+                    method: 'PUT', 
+                    headers: { 
+                      'Content-type': 'application/json'
+                    }, 
+                  }).then( function (response) {
+                    // console.log(response)
+    
+                    if( response.ok == true ){
+                        window.alert(`Meze pro ${type} byly změněny.`)
+                        wrapper.innerHTML = ""
+                        make_chart(wrapper , type)
+                    }else{
+                        window.alert(`Nesprávný vstup.`)
+                    }
+    
+                  } ); 
+    
+                
+    
+            } )
 
-            window.alert(`Meze pro ${type} byly změněny.`)
 
         } )
+
+        
 
         
     }
@@ -586,7 +613,7 @@ async function get_data(url) {
     await fetch(url).then(function(response) {
         return response.json();
     }).then(function(data) {
-        console.log(data);
+        // console.log(data);
         return data
     }).catch(function(err) {
         console.log('Fetch Error :-S', err);

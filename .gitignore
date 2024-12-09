@@ -1,1 +1,9 @@
 .idea/*
+/.env
+/data/database.sqlite
+/data/logs/fallback_access.log
+/data/logs/fallback_error.log
+/data/keys.json
+/influxdb_2_api_sync/sync_config.json
+/influxdb_2_api_sync/UUIDs.json
+/mqtt_client/UUIDs.json

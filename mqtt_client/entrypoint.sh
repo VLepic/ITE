@@ -13,7 +13,8 @@ cat <<EOF > /app/mqtt_client_config.json
   "LOGGING_LEVEL": "${LOGGING_LEVEL}",
   "BASE_URL": "${BASE_URL}",
   "AIMTEC_USERNAME": "${AIMTEC_USERNAME}",
-  "AIMTEC_PASSWORD": "${AIMTEC_PASSWORD}"
+  "AIMTEC_PASSWORD": "${AIMTEC_PASSWORD}",
+  "SEND_TO_API": "${SEND_TO_API}"
 }
 EOF
 

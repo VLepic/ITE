@@ -7,7 +7,7 @@ import eventlet
 from threading import Thread
 import os
 from joblib import Parallel, delayed
-from Read import read, read_latest  # Assuming these functions are properly imported
+from Read import read, read_latest
 from datetime import datetime
 from approutes.RESTAPI import *
 import threading
@@ -37,6 +37,8 @@ socketio = SocketIO(app, ping_timeout=60, ping_interval=30, cors_allowed_origins
 # Data routes
 RESTAPI_route(app)
 latest_RESTAPI_route(app)
+metadata_RESTAPI_route(app)
+static_info_RESTAPI_route(app)
 
 @socketio.on('connect')
 def handle_connect():

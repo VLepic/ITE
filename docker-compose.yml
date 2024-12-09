@@ -17,6 +17,31 @@ services:
     networks:
         - app_network
 
+  api_manager:
+    build: ./api_manager
+    container_name: api_manager
+    ports:
+      - "5001:5000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - TZ=${TZ}
+      - TEAM_NAME=${TEAM_NAME}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+      - DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN=${DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - sensorUUID_TEMPERATURE=${sensorUUID_TEMPERATURE}
+      - sensorUUID_HUMIDITY=${sensorUUID_HUMIDITY}
+      - sensorUUID_ILLUMINATION=${sensorUUID_ILLUMINATION}
+      - AIMTEC_USERNAME=${AIMTEC_USERNAME}
+      - AIMTEC_PASSWORD=${AIMTEC_PASSWORD}
+    volumes:
+        - ./api_manager:/app
+    networks:
+        - app_network
+
   api_server:
     build: ./api_server
     container_name: api_server
@@ -36,6 +61,47 @@ services:
       - influxdb
     networks:
       - app_network
+
+  influxdb_2_api_sync:
+    build: ./influxdb_2_api_sync
+    container_name: influxdb_2_api_sync
+    environment:
+      - TZ=${TZ}
+      - TEAM_NAME=${TEAM_NAME}
+      - BROKER_IP=${BROKER_IP}
+      - BROKER_PORT=${BROKER_PORT}
+      - BROKER_USERNAME=${BROKER_USERNAME}
+      - BROKER_PASSWORD=${BROKER_PASSWORD}
+      - INFLUXDB_URL = "http://influxdb:8086"
+      - DOCKER_INFLUXDB_INIT_API_2_INFLUX_TOKEN=${DOCKER_INFLUXDB_INIT_API_2_INFLUX_TOKEN}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - LOGGING_LEVEL=${LOGGING_LEVEL}
+      - BASE_URL=${BASE_URL}
+      - AIMTEC_USERNAME=${AIMTEC_USERNAME}
+      - AIMTEC_PASSWORD=${AIMTEC_PASSWORD}
+      - WRITE_TO_SELECTED=${WRITE_TO_SELECTED}
+      - SYNC_INTERVAL=${SYNC_INTERVAL}
+      - sensorUUID_TEMPERATURE=${sensorUUID_TEMPERATURE}
+      - sensorUUID_HUMIDITY=${sensorUUID_HUMIDITY}
+      - sensorUUID_ILLUMINATION=${sensorUUID_ILLUMINATION}
+    volumes:
+      - ./influxdb_2_api_sync:/app
+    depends_on:
+      - influxdb
+    entrypoint: ./entrypoint.sh
+    networks:
+      - app_network
+
+  web:
+    image: nginx:latest
+    container_name: nginx_webserver
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    restart: always
+
 
   influxdb:
     image: influxdb:2.0
@@ -79,6 +145,7 @@ services:
       - sensorUUID_HUMIDITY=${sensorUUID_HUMIDITY}
       - sensorUUID_ILLUMINATION=${sensorUUID_ILLUMINATION}
       - LOGGING_LEVEL=${LOGGING_LEVEL}
+      - SEND_TO_API=${SEND_TO_API}
     entrypoint: ./entrypoint.sh
     volumes:
       - ./mqtt_client:/app
@@ -87,43 +154,19 @@ services:
     networks:
       - app_network
 
-  nginx:
-    image: nginx:latest
-    container_name: nginx_proxy
+  nginx_proxy_manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx_proxy_manager
+    restart: always
     ports:
-      - "80:80"       # Expose port 80 for HTTP
-      - "443:443"     # Expose port 443 for HTTPS
+      - "80:80"       # HTTP
+      - "81:81"       # Web UI
+      - "443:443"     # HTTPS
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - certs:/etc/letsencrypt  # Certificates for HTTPS
-      - ./webroot:/var/www/html  # Shared folder for HTTP-01 challenge
-
-    depends_on:
-      - api_server
-      - certbot
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
     networks:
       - app_network
-
-  certbot:
-      image: certbot/certbot
-      container_name: certbot
-      volumes:
-        - certs:/etc/letsencrypt  # Shared volume for certificates
-        - ./webroot:/var/www/html  # Folder for HTTP-01 challenge
-      entrypoint: >
-        sh -c "
-        certbot certonly
-        --webroot
-        -w /var/www/html
-        -d sulis104.zcu.cz
-        --non-interactive
-        --agree-tos
-        --email vlepic@students.zcu.cz
-        && trap exit TERM;
-        while :; do sleep 12h & wait $!; done"
-      restart: always
-      networks:
-        - app_network
 
   grafana:
     image: grafana/grafana:latest

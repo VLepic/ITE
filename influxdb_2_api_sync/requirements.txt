@@ -1,0 +1,6 @@
+tqdm
+ujson
+pytz
+influxdb_client
+requests
+

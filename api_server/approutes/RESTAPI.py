@@ -5,7 +5,7 @@ from threading import Thread
 from flask import jsonify, request
 from flask_socketio import SocketIO
 import eventlet
-from Read import read, read_latest
+from Read import read, read_latest, count_all_datapoints
 from datetime import datetime
 import logging
 
@@ -74,6 +74,55 @@ def latest_RESTAPI_route(app):
         time_values_iso = [time.isoformat() for time in time_values]
 
         return jsonify({'time_values': time_values_iso, 'measurement_values': measurement_values}), 200
+
+def static_info_RESTAPI_route(app):
+    @app.route('/static_info', methods=['GET'])
+    def get_static_info():
+        return jsonify({"ESP8266" : "30.10.2024", "DHT22": "30.10.2024", "BH1750": "21.11.2024", "RTC DS3231 AT24C32": "21.11.2024"})
+
+def metadata_RESTAPI_route(app):
+
+    @app.route('/<team_name>/metadata', methods=['GET'])
+    def get_metadata(team_name):
+        measurements = ['temperature', 'humidity', 'illumination']
+        measurement_exist = []
+        INFLUXDB_URL = "http://influxdb:8086"
+        INFLUXDB_TOKEN = os.environ.get('DOCKER_INFLUXDB_INIT_API_SERVER_TOKEN', 'default-influxdb-token')
+        ORG = os.environ.get('DOCKER_INFLUXDB_INIT_ORG', 'default-influxdb-org')
+        BUCKET = os.environ.get('DOCKER_INFLUXDB_INIT_BUCKET', 'default-influxdb-bucket')
+        field = "value"
+
+        if not is_team_in_database(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name):
+            return jsonify({'error': 'Team not found in the database'}), 404
+
+
+        logging.info(f'Received request for {team_name} metadata')
+        is_teamperature = is_measurement_in_database(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "sensor", "temperature")
+        is_humidity = is_measurement_in_database(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "sensor", "humidity")
+        is_illumination = is_measurement_in_database(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "sensor", "illumination")
+
+        count_temperature = 0
+        count_humidity = 0
+        count_illumination = 0
+
+        if is_teamperature:
+            count_temperature = count_all_datapoints(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "temperature", field)
+        if is_humidity:
+            count_humidity = count_all_datapoints(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "humidity", field)
+        if is_illumination:
+            count_illumination = count_all_datapoints(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "illumination", field)
+
+
+        return jsonify({'team name': f'{team_name}',
+                        'temperature': is_measurement_in_database(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "sensor", "temperature"),
+                        'humidity': is_measurement_in_database(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "sensor", "humidity"),
+                        'illumination': is_measurement_in_database(INFLUXDB_URL, INFLUXDB_TOKEN, ORG, BUCKET, team_name, "sensor", "illumination"),
+                        'num_of_temperature_datapoints': count_temperature,
+                        'num_of_humidity_datapoints': count_humidity,
+                        'num_of_illumination_datapoints': count_illumination
+                        }), 200
+
+
 
 
 def is_measurement_in_database(url: str, token: str, org: str, bucket: str, team: str, tag_key: str, tag_value: str) -> bool:

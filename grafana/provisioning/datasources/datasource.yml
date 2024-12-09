@@ -1,0 +1,14 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    url: http://influxdb:8086
+    access: proxy
+    isDefault: true
+    jsonData:
+      organization: ITE_2024
+      defaultBucket: team_data
+      version: Flux
+    secureJsonData:
+      token: sagvast5y56ur6herthe4gt34wgfervfdsbnrtdhsUYFTY

@@ -51,22 +51,59 @@ BROKER_PASSWORD = secrets["BROKER_PASSWORD"]
 TEAM_NAME = secrets["TEAM_NAME"]
 TIME_SYNC_INTERVAL = int(secrets["TIME_SYNC_INTERVAL"])  # RTC synchronization interval in seconds
 QUEUE_LENGTH = int(secrets["QUEUE_LENGTH"])  # Length of RAM queue
+#TOPIC = 'ite/practise/test_topic'
 TOPIC = f"ite/{TEAM_NAME}"
 PAYLOAD_FILE = "payload_queue.json"
 
 ram_queue_full = False  # Tracks if the RAM queue is full
 
-# Load payload queue from file if it exists
-if PAYLOAD_FILE in os.listdir():
-    with open(PAYLOAD_FILE, "r") as f:
+
+def is_valid_payload(payload):
+    """Validate the payload format."""
+    # Pokud je payload už dictionary, přeskočíme deserializaci
+    if isinstance(payload, dict):
+        data = payload
+    else:
         try:
-            payload_file_queue = ujson.load(f)
-        except ValueError:
-            payload_file_queue = []
-else:
-    payload_file_queue = []
+            data = ujson.loads(payload)
+        except (ValueError, TypeError):
+            return False
+
+    # Kontrola klíčů a jejich typů
+    required_keys = ["team_name", "timestamp"]
+    return all(key in data for key in required_keys) and isinstance(data["timestamp"], str)
+
+def load_and_validate_payload_queue(max_items=10):
+    """Load payload queue from file and validate each entry, with a max limit."""
+    if PAYLOAD_FILE not in os.listdir():
+        print(f"File {PAYLOAD_FILE} not found. Creating a new file.")
+        with open(PAYLOAD_FILE, "w") as f:
+            ujson.dump([], f)
+        return []
+
+    try:
+        with open(PAYLOAD_FILE, "r") as f:
+            raw_queue = ujson.load(f)
+        print(f"Loaded {len(raw_queue)} items from file queue.")
+
+        # Limit the number of items to load
+        if len(raw_queue) > max_items:
+            raw_queue = raw_queue[:max_items]
+            print(f"Truncated file queue to {max_items} items.")
+
+        valid_queue = [item for item in raw_queue if is_valid_payload(item)]
+        return valid_queue
+    except Exception as e:
+        print(f"Error loading or parsing file queue: {e}")
+        return []
+
+
+
+# Load payload queue from file if it exists
+payload_file_queue = load_and_validate_payload_queue()
 
 payload_queue = deque([], QUEUE_LENGTH)  # RAM queue
+
 
 def setledcolor(R, G, B):
     """Set LED color using RGB values."""
@@ -86,7 +123,7 @@ def save_payload_to_file(payload):
         if PAYLOAD_FILE in os.listdir():
             with open(PAYLOAD_FILE, "r") as f:
                 file_queue = ujson.load(f)
-
+        print(payload)
         file_queue.append(payload)
 
         with open(PAYLOAD_FILE, "w") as f:
@@ -352,6 +389,20 @@ def main():
         if client is not None:
             client.disconnect()
 
+
+def test_file_queue_operations():
+    test_payload = {
+        "team_name": TEAM_NAME,
+        "timestamp": get_timestamp()
+    }
+    print("Saving test payload to file queue...")
+    save_payload_to_file(test_payload)
+    print("Re-loading file queue...")
+    loaded_queue = load_and_validate_payload_queue()
+    print(f"Reloaded queue: {loaded_queue}")
+
+# Zavolejte tento testovací blok:
+test_file_queue_operations()
 
 # Start the main function
 main()

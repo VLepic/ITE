@@ -5,7 +5,7 @@ import machine
 from machine import Pin, I2C, RTC
 from utime import sleep
 from bh1750 import BH1750
-from umqtt.simple import MQTTClient
+from simple import MQTTClient
 import ntptime
 from time import localtime, mktime
 import ubinascii
@@ -55,8 +55,6 @@ QUEUE_LENGTH = int(secrets["QUEUE_LENGTH"])  # Length of RAM queue
 TOPIC = f"ite/{TEAM_NAME}"
 PAYLOAD_FILE = "payload_queue.json"
 
-ram_queue_full = False  # Tracks if the RAM queue is full
-
 
 def is_valid_payload(payload):
     """Validate the payload format."""
@@ -73,35 +71,6 @@ def is_valid_payload(payload):
     required_keys = ["team_name", "timestamp"]
     return all(key in data for key in required_keys) and isinstance(data["timestamp"], str)
 
-def load_and_validate_payload_queue(max_items=10):
-    """Load payload queue from file and validate each entry, with a max limit."""
-    if PAYLOAD_FILE not in os.listdir():
-        print(f"File {PAYLOAD_FILE} not found. Creating a new file.")
-        with open(PAYLOAD_FILE, "w") as f:
-            ujson.dump([], f)
-        return []
-
-    try:
-        with open(PAYLOAD_FILE, "r") as f:
-            raw_queue = ujson.load(f)
-        print(f"Loaded {len(raw_queue)} items from file queue.")
-
-        # Limit the number of items to load
-        if len(raw_queue) > max_items:
-            raw_queue = raw_queue[:max_items]
-            print(f"Truncated file queue to {max_items} items.")
-
-        valid_queue = [item for item in raw_queue if is_valid_payload(item)]
-        return valid_queue
-    except Exception as e:
-        print(f"Error loading or parsing file queue: {e}")
-        return []
-
-
-
-# Load payload queue from file if it exists
-payload_file_queue = load_and_validate_payload_queue()
-
 payload_queue = deque([], QUEUE_LENGTH)  # RAM queue
 
 
@@ -111,44 +80,6 @@ def setledcolor(R, G, B):
     ledGreen.value(G)
     ledBlue.value(B)
 
-def save_payloads_to_file():
-    """Save the entire RAM queue to the file queue."""
-    with open(PAYLOAD_FILE, "w") as f:
-        ujson.dump(list(payload_queue), f)
-
-def save_payload_to_file(payload):
-    """Append a single payload to the file queue."""
-    try:
-        file_queue = []
-        if PAYLOAD_FILE in os.listdir():
-            with open(PAYLOAD_FILE, "r") as f:
-                file_queue = ujson.load(f)
-        print(payload)
-        file_queue.append(payload)
-
-        with open(PAYLOAD_FILE, "w") as f:
-            ujson.dump(file_queue, f)
-        print("Saved payload to file queue:", payload)
-    except Exception as e:
-        print("Error saving payload to file:", e)
-
-def save_ram_queue_to_file():
-    """Save all RAM queue items to the file queue."""
-    try:
-        file_queue = []
-        if PAYLOAD_FILE in os.listdir():
-            with open(PAYLOAD_FILE, "r") as f:
-                file_queue = ujson.load(f)
-
-        # Append all items in the RAM queue to the file queue
-        file_queue.extend(list(payload_queue))
-
-        with open(PAYLOAD_FILE, "w") as f:
-            ujson.dump(file_queue, f)
-
-        print(f"Saved RAM queue ({len(payload_queue)}) to file.")
-    except Exception as e:
-        print("Error saving RAM queue to file:", e)
 
 def connect_wifi(timeout=30):
     """Connect to Wi-Fi within a specified timeout period."""
@@ -257,7 +188,7 @@ def get_rtc_unix_time():
 
 
 def publish_data(client, temperature=None, humidity=None, illumination=None, timestamp=None):
-    global ram_queue_full, payload_queue
+    global payload_queue
 
     # Construct the payload
     message = {
@@ -275,47 +206,36 @@ def publish_data(client, temperature=None, humidity=None, illumination=None, tim
 
     # Handle disconnected MQTT client
     if client is None:
-        if not ram_queue_full:
-            payload_queue.append(payload)  # Queue in RAM
-            print("Queued payload to RAM:", payload)
+        payload_queue.append(payload)  # Queue in RAM
+        print("Queued payload to RAM:", payload)
+        print("Current RAM queue length:", len(payload_queue))
 
-            if len(payload_queue) >= QUEUE_LENGTH:
-                save_ram_queue_to_file()  # Save RAM queue to file
-                payload_queue = deque([], QUEUE_LENGTH)  # Reset RAM queue
-                ram_queue_full = True
-                print("RAM queue full. Switching to file-based queue.")
-        else:
-            save_payload_to_file(payload)  # Save directly to file if RAM queue is full
-            print("Saved payload directly to file queue:", payload)
         return False
 
     try:
-        # Publish any queued payloads from file
-        while payload_file_queue:
-            queued_payload = payload_file_queue.pop(0)
-            client.publish(TOPIC, queued_payload)
-            print("Published queued payload from file:", queued_payload)
-        save_payloads_to_file()  # Save updated file queue
-
         # Publish any queued payloads from RAM
         while payload_queue:
             queued_payload = payload_queue.popleft()
-            client.publish(TOPIC, queued_payload)
+            queued_payload_bytes = queued_payload.encode('utf-8')  # Convert to bytes
+            client.publish(TOPIC, queued_payload_bytes)
             print("Published queued payload from RAM:", queued_payload)
+            print("Current RAM queue length:", len(payload_queue))
 
         # Publish the current payload
-        client.publish(TOPIC, payload)
+        payload_bytes = payload.encode('utf-8')  # Convert to bytes
+        client.publish(TOPIC, payload_bytes)
         print("Published:", payload)
         return True
     except Exception as e:
         print("Error publishing data:", e)
-        if not ram_queue_full:
-            payload_queue.append(payload)  # Requeue in RAM
-            print("Queued payload to RAM:", payload)
-        else:
-            save_payload_to_file(payload)  # Save directly to file
-            print("Saved payload directly to file queue:", payload)
+        payload_queue.append(payload)  # Requeue in RAM
+        print("Queued payload to RAM:", payload)
+        print("Current RAM queue length:", len(payload_queue))
         return False
+
+
+
+
 
 
 def main():
@@ -370,7 +290,6 @@ def main():
                             print("Reconnected to MQTT broker.")
                 else:
                     print("No data available to publish.")
-
             # Daily RTC synchronization
             if current_time - last_sync >= TIME_SYNC_INTERVAL:
                 setledcolor(0, 1, 1)
@@ -389,24 +308,5 @@ def main():
         if client is not None:
             client.disconnect()
 
-
-def test_file_queue_operations():
-    test_payload = {
-        "team_name": TEAM_NAME,
-        "timestamp": get_timestamp()
-    }
-    print("Saving test payload to file queue...")
-    save_payload_to_file(test_payload)
-    print("Re-loading file queue...")
-    loaded_queue = load_and_validate_payload_queue()
-    print(f"Reloaded queue: {loaded_queue}")
-
-# Zavolejte tento testovací blok:
-test_file_queue_operations()
-
 # Start the main function
 main()
-
-
-
-

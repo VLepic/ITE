@@ -3,7 +3,7 @@
     --border_col: rgb(48, 48, 48);
     --background_col : rgb(226, 226, 226);
     --secondary_col: rgb(195, 201, 200);
-    --font_col: rgb(53, 53, 53);
+    --font_col: rgb(105, 105, 105);
 
     --team_col: red;
 
@@ -35,30 +35,30 @@
     --highlight : rgb(49, 49, 49);
 }
 
-@keyframes alarm{
+/* @keyframes alarm{
     0% { background-color: transparent; }
     50% {background-color: red;}
     100% {background-color: transparent;}
-}
+} */
 
-.alert{
+/* .alert{
     animation-name: alarm !important;
     animation-duration: 4s;
     animation-iteration-count: infinite;
-}
+} */
 
 
-@keyframes break{
+/* @keyframes break{
     0% { background-color: transparent; }
     50% {background-color: rgb(255, 136, 0);}
     100% {background-color: transparent;}
-}
+} */
 
-.broken{
+/* .broken{
     animation-name: break;
     animation-duration: 4s;
     animation-iteration-count: infinite;
-}
+} */
 
 a{
     display: inline-block;

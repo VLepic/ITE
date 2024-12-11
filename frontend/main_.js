@@ -15,6 +15,12 @@ let colorthemes = {
     'black' : 'darkslateblue'
 }
 
+const alarms = {
+    'alert' : "background:linear-gradient(90deg, rgba(2,0,36,0) 0%, rgba(137,90,76,0) 50%, rgba(255,0,0,1) 100%)",
+    'broken': "background:linear-gradient(90deg, rgba(255,179,0,1) 0%, rgba(137,90,76,0) 50%, rgba(255,0,0,0) 100%)",
+    'alert_broken' : "background:linear-gradient(90deg, rgba(255,179,0,1) 0%, rgba(137,90,76,0) 50%, rgba(255,0,0,1) 100%)",
+}
+
 let checker
 let dark = false
 
@@ -89,10 +95,6 @@ function update(){
         document.documentElement.setAttribute("data-theme", "light")
         document.querySelector("#sun").style.display = "block"
         document.querySelector("#moon").style.display = "none"
-    }
-
-    function add_broken_alert(element){
-        element.classList.add("broken")
     }
 
     // Přihlášení k odběru teploty
@@ -479,8 +481,8 @@ async function make_chart(wrapper , type = "temperature"){
             wrapper.innerHTML = wrapper.innerHTML.concat(`
                 <p>Limity upozornění:</p>
                 <span style="display : inline-block;" >
-                    <p>Max: <input class="dial" type="number" id="max" value="${alerts.highValue}"> </p>
-                    <p>Min: <input class="dial" type="number" id="min" value="${alerts.lowValue}"> </p>
+                    <p>Max: <input class="dial" type="number" id="max" value="${alerts.highValue}"> ${units[type]} </p>
+                    <p>Min: <input class="dial" type="number" id="min" value="${alerts.lowValue}"> ${units[type]} </p>
                     <p>Heslo: <input class="dial" type="password" id="pass" value=""> </p>
                     <button style="margin-top:10px; margin-left:10px" id="submit" >Nastavit</button>
                 </span>
@@ -498,6 +500,7 @@ async function make_chart(wrapper , type = "temperature"){
                 await fetch(`https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/changeboundaries/${type}?login=pink&password=${pass}&min_value=${low}&max_value=${high}`, {
                     method: 'PUT',
                     headers: {
+
                       'Content-type': 'application/json'
                     },
                   }).then( function (response) {
@@ -587,7 +590,7 @@ async function make_chart(wrapper , type = "temperature"){
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Measurement'
+                        text: `Measurement [${units[type]}]`
                     }
                 }
             },

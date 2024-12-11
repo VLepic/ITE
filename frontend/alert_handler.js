@@ -49,6 +49,23 @@ function add_alert(element_id){
     let e = document.getElementById(element_id)
     if( e !== null ){
         e.classList.add("alert")
+        if(e.classList.contains("broken")){
+            e.style.cssText += alarms["alert_broken"]
+        }else{
+            e.style.cssText += alarms["alert"]
+        }
+
+
+        
     }
     
+}
+
+function add_broken_alert(element){
+    element.classList.add("broken")
+    if(e.classList.contains("alert")){
+        e.style.cssText += alarms["alert_broken"]
+    }else{
+        e.style.cssText += alarms["broken"]
+    }
 }

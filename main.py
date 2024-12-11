@@ -119,6 +119,22 @@ def connect_mqtt():
         print("MQTT connection error:", e)
         return None
 
+def reconnect_mqtt(retries=3, delay=5):
+    """Attempt to reconnect to MQTT broker."""
+    for attempt in range(retries):
+        try:
+            print(f"Attempting to reconnect to MQTT broker (Attempt {attempt + 1}/{retries})...")
+            client = connect_mqtt()
+            if client is not None:
+                print("Reconnected to MQTT broker.")
+                return client
+        except Exception as e:
+            print(f"MQTT reconnection failed: {e}")
+        time.sleep(delay)
+    print("MQTT reconnection failed after retries.")
+    return None
+
+
 def sync_rtc_with_ntp():
     """Synchronize the RTC with an NTP server (UTC)."""
     if rtc_ds:
@@ -285,7 +301,7 @@ def main():
                 if any([temperature, humidity, illumination]):
                     if not publish_data(client, temperature, humidity, illumination, timestamp):
                         print("Reconnecting to MQTT broker...")
-                        client = connect_mqtt()
+                        client = reconnect_mqtt()
                         if client is not None:
                             print("Reconnected to MQTT broker.")
                 else:

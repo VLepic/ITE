@@ -119,7 +119,7 @@ class MQTTClient:
             sz >>= 7
             i += 1
         pkt[i] = sz
-        #print(hex(len(pkt)), hexlify(pkt, ":"))
+        # print(hex(len(pkt)), hexlify(pkt, ":"))
         self.sock.write(pkt, i + 1)
         self._send_str(topic)
         if qos > 0:
@@ -129,7 +129,7 @@ class MQTTClient:
             self.sock.write(pkt, 2)
         self.sock.write(msg)
         if qos == 1:
-            while 1:
+            while True:
                 op = self.wait_msg()
                 if op == 0x40:
                     sz = self.sock.read(1)
@@ -137,6 +137,7 @@ class MQTTClient:
                     rcv_pid = self.sock.read(2)
                     rcv_pid = rcv_pid[0] << 8 | rcv_pid[1]
                     if pid == rcv_pid:
+                        print(f"QoS 1 PUBACK received for message ID {pid}")
                         return
         elif qos == 2:
             assert 0

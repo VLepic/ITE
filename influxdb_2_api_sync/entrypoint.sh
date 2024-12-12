@@ -1,4 +1,7 @@
 #!/bin/sh
+
+# Create or overwrite sync_config.json only if it does not exist
+if [ ! -f /app/sync_config.json ]; then
 cat <<EOF > /app/sync_config.json
 {
   "TEAM_NAME": "${TEAM_NAME}",
@@ -18,8 +21,10 @@ cat <<EOF > /app/sync_config.json
   "INTERVAL_SECONDS": "${SYNC_INTERVAL}"
 }
 EOF
+fi
 
-
+# Create or overwrite UUIDs.json only if it does not exist
+if [ ! -f /app/UUIDs.json ]; then
 cat <<EOF > /app/UUIDs.json
 {
   "temperature":"${sensorUUID_TEMPERATURE}",
@@ -27,6 +32,7 @@ cat <<EOF > /app/UUIDs.json
   "illumination":"${sensorUUID_ILLUMINATION}"
 }
 EOF
+fi
 
-# Start the MQTT client
+# Start the main script
 exec python main.py

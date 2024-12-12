@@ -1,4 +1,7 @@
 #!/bin/sh
+
+# Create or overwrite mqtt_client_config.json only if it does not exist
+if [ ! -f /app/mqtt_client_config.json ]; then
 cat <<EOF > /app/mqtt_client_config.json
 {
   "TEAM_NAME": "${TEAM_NAME}",
@@ -17,7 +20,10 @@ cat <<EOF > /app/mqtt_client_config.json
   "SEND_TO_API": "${SEND_TO_API}"
 }
 EOF
+fi
 
+# Create or overwrite UUIDs.json only if it does not exist
+if [ ! -f /app/UUIDs.json ]; then
 cat <<EOF > /app/UUIDs.json
 {
   "temperature":"${sensorUUID_TEMPERATURE}",
@@ -25,6 +31,8 @@ cat <<EOF > /app/UUIDs.json
   "illumination":"${sensorUUID_ILLUMINATION}"
 }
 EOF
+fi
 
 # Start the MQTT client
 exec python mqtt_client.py
+

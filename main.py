@@ -5,7 +5,7 @@ import machine
 from machine import Pin, I2C, RTC
 from utime import sleep
 from bh1750 import BH1750
-from simple import MQTTClient
+import gc
 import ntptime
 from time import localtime, mktime
 import ubinascii
@@ -13,6 +13,7 @@ import ujson
 import os
 from collections import deque
 from ds3231 import DS3231
+from simple import MQTTClient
 
 # Initialize sensors and pins
 sensor = dht.DHT22(Pin(5))  # DHT22 sensor on GPIO5
@@ -50,7 +51,8 @@ BROKER_USERNAME = secrets["BROKER_USERNAME"]
 BROKER_PASSWORD = secrets["BROKER_PASSWORD"]
 TEAM_NAME = secrets["TEAM_NAME"]
 TIME_SYNC_INTERVAL = int(secrets["TIME_SYNC_INTERVAL"])  # RTC synchronization interval in seconds
-QUEUE_LENGTH = int(secrets["QUEUE_LENGTH"])  # Length of RAM queue
+#QUEUE_LENGTH = int(secrets["QUEUE_LENGTH"])  # Length of RAM queue
+QUEUE_LENGTH = 60
 #TOPIC = 'ite/practise/test_topic'
 TOPIC = f"ite/{TEAM_NAME}"
 PAYLOAD_FILE = "payload_queue.json"
@@ -119,7 +121,7 @@ def connect_mqtt():
         print("MQTT connection error:", e)
         return None
 
-def reconnect_mqtt(retries=3, delay=5):
+def reconnect_mqtt(retries=3, delay=3):
     """Attempt to reconnect to MQTT broker."""
     for attempt in range(retries):
         try:
@@ -127,12 +129,15 @@ def reconnect_mqtt(retries=3, delay=5):
             client = connect_mqtt()
             if client is not None:
                 print("Reconnected to MQTT broker.")
+                publish_data_from_ram(client)
                 return client
         except Exception as e:
             print(f"MQTT reconnection failed: {e}")
-        time.sleep(delay)
+            time.sleep(delay)
+            gc.collect()
     print("MQTT reconnection failed after retries.")
     return None
+
 
 
 def sync_rtc_with_ntp():
@@ -202,6 +207,32 @@ def get_rtc_unix_time():
         print("Error fetching RTC Unix time:", e)
         return None
 
+def publish_data_from_ram(client, max_retries=3):
+    """Publish queued payloads from RAM queue with retry limits."""
+    while payload_queue:  # Process all items in the queue
+        queued_payload = payload_queue.popleft()  # Get the next payload
+        retries = 0
+        while retries < max_retries:
+            try:
+                queued_payload_bytes = queued_payload.encode('utf-8')  # Convert to bytes
+                client.publish(TOPIC, queued_payload_bytes, qos=1)  # Publish with QoS 1
+                print("Published queued payload from RAM:", queued_payload)
+                break  # Exit the retry loop on success
+            except Exception as e:
+                print(f"Error publishing payload (Attempt {retries + 1}/{max_retries}):", e)
+                retries += 1
+                time.sleep(1)  # Small delay before retrying
+        else:
+            # If max retries exceeded, requeue the payload
+            payload_queue.appendleft(queued_payload)
+            print("Failed to publish after retries, requeued payload:", queued_payload)
+            break  # Exit the loop to prevent infinite retries
+    print("Current RAM queue length:", len(payload_queue))
+    print("Free memory before gc:", gc.mem_free())
+    gc.collect()
+    print("Free memory after gc:", gc.mem_free())
+
+
 
 def publish_data(client, temperature=None, humidity=None, illumination=None, timestamp=None):
     global payload_queue
@@ -225,27 +256,28 @@ def publish_data(client, temperature=None, humidity=None, illumination=None, tim
         payload_queue.append(payload)  # Queue in RAM
         print("Queued payload to RAM:", payload)
         print("Current RAM queue length:", len(payload_queue))
+        print("Free memory before gc:", gc.mem_free())
+        gc.collect()
+        print("Free memory after gc:", gc.mem_free())
 
         return False
 
     try:
-        # Publish any queued payloads from RAM
-        while payload_queue:
-            queued_payload = payload_queue.popleft()
-            queued_payload_bytes = queued_payload.encode('utf-8')  # Convert to bytes
-            client.publish(TOPIC, queued_payload_bytes)
-            print("Published queued payload from RAM:", queued_payload)
-            print("Current RAM queue length:", len(payload_queue))
-
         # Publish the current payload
         payload_bytes = payload.encode('utf-8')  # Convert to bytes
-        client.publish(TOPIC, payload_bytes)
+        client.publish(TOPIC, payload_bytes, qos=1)
         print("Published:", payload)
+        print("Free memory before gc:", gc.mem_free())
+        gc.collect()
+        print("Free memory after gc:", gc.mem_free())
         return True
     except Exception as e:
         print("Error publishing data:", e)
         payload_queue.append(payload)  # Requeue in RAM
         print("Queued payload to RAM:", payload)
+        print("Free memory before gc:", gc.mem_free())
+        gc.collect()
+        print("Free memory after gc:", gc.mem_free())
         print("Current RAM queue length:", len(payload_queue))
         return False
 

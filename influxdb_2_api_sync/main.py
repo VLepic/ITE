@@ -153,27 +153,56 @@ def sync(measurement, write_to_option, time_from, time_to, api_datapoints):
         sync_influxdb_to_api(NOT_IN_INFLUXDB, measurement)
 
 def execute_periodically(interval):
+    backoff_time = 2  # Start with 2 seconds for exponential backoff
+
     while True:
+        try:
+            # Pokus o přihlášení k API
+            while not api.login():
+                logging.warning("Nepodařilo se přihlásit k API. Pokusím se znovu za %d sekund...", backoff_time)
+                time.sleep(backoff_time)
+                backoff_time = min(backoff_time * 2, 300)  # Exponentiální zpoždění (max 5 minut)
 
+            backoff_time = 2
 
-        while not api.login():
-            logging.info("Attempting to log in to API...")
-            time.sleep(2)
-        temp_data = api.readAllMeasurements_from_single_sensor_by_type("temperature")
-        hum_data = api.readAllMeasurements_from_single_sensor_by_type("humidity")
-        ill_data = api.readAllMeasurements_from_single_sensor_by_type("illumination")
-        data = {"temperature": temp_data, "humidity": hum_data, "illumination": ill_data}
-        first_date_api = find_first_date(temp_data, hum_data, ill_data)
-        first_date_influxdb = Read.get_first_record_datetime(INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET, TEAM_NAME, "illumination", "value").isoformat().replace("+01:00", "Z")
-        start, end = get_date_range(find_earliest_datetime([first_date_api, first_date_influxdb]), datetime.now(timezone(timedelta(hours=1))).isoformat(timespec='seconds').replace('+01:00', 'Z'))
+            # Načtení dat z API
+            temp_data = api.readAllMeasurements_from_single_sensor_by_type("temperature")
+            hum_data = api.readAllMeasurements_from_single_sensor_by_type("humidity")
+            ill_data = api.readAllMeasurements_from_single_sensor_by_type("illumination")
+            data = {"temperature": temp_data, "humidity": hum_data, "illumination": ill_data}
 
-        print(end)
+            # Najít první datum
+            first_date_api = find_first_date(temp_data, hum_data, ill_data)
+            first_date_influxdb = Read.get_first_record_datetime(
+                INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET, TEAM_NAME, "illumination", "value"
+            ).isoformat().replace("+01:00", "Z")
 
-        for start_date, end_date in zip(start, end):
-            print(f"{start_date} - {end_date}")
-            for measurement_to_sync in MEASUREMENTS_TO_SYNC:
-                sync(measurement_to_sync, WRITE_TO_SELECTED.upper(), start_date, end_date, filter_data_by_date_range(data[measurement_to_sync], start_date, end_date))
-        time.sleep(interval)
+            # Získání rozsahu dat
+            start, end = get_date_range(
+                find_earliest_datetime([first_date_api, first_date_influxdb]),
+                datetime.now(timezone(timedelta(hours=1))).isoformat(timespec='seconds').replace('+01:00', 'Z')
+            )
+
+            # Synchronizace měření v daném rozsahu
+            for start_date, end_date in zip(start, end):
+                logging.info("Synchronizuji data od %s do %s...", start_date, end_date)
+                for measurement_to_sync in MEASUREMENTS_TO_SYNC:
+                    sync(
+                        measurement_to_sync,
+                        WRITE_TO_SELECTED.upper(),
+                        start_date,
+                        end_date,
+                        filter_data_by_date_range(data[measurement_to_sync], start_date, end_date)
+                    )
+
+            # Čekání před dalším během
+            time.sleep(interval)
+
+        except Exception as e:
+            logging.error("Došlo k chybě: %s. Pokusím se znovu za %d sekund...", e, backoff_time)
+            time.sleep(backoff_time)
+            backoff_time = min(backoff_time * 2, 300)  # Exponentiální zpoždění (max 5 minut)
+
 
 
 

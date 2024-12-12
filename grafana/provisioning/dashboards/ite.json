@@ -1758,7 +1758,7 @@
           "refId": "A"
         }
       ],
-      "title": "Average temperature",
+      "title": "Average humidity",
       "transparent": true,
       "type": "stat"
     },
@@ -3132,6 +3132,6 @@
   "timezone": "browser",
   "title": "ITE",
   "uid": "ae3ndb62iwow0c",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }

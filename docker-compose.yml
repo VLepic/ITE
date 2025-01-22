@@ -22,6 +22,7 @@ services:
     container_name: api_manager
     ports:
       - "5001:5000"
+    restart: unless-stopped
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -37,16 +38,21 @@ services:
       - sensorUUID_ILLUMINATION=${sensorUUID_ILLUMINATION}
       - AIMTEC_USERNAME=${AIMTEC_USERNAME}
       - AIMTEC_PASSWORD=${AIMTEC_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
         - ./api_manager:/app
     networks:
         - app_network
+
 
   api_server:
     build: ./api_server
     container_name: api_server
     ports:
       - "5000:5000"
+    restart: unless-stopped
     environment:
       - TZ=${TZ}
       - TEAM_NAME=${TEAM_NAME}
@@ -65,6 +71,7 @@ services:
   influxdb_2_api_sync:
     build: ./influxdb_2_api_sync
     container_name: influxdb_2_api_sync
+    restart: unless-stopped
     environment:
       - TZ=${TZ}
       - TEAM_NAME=${TEAM_NAME}
@@ -100,7 +107,7 @@ services:
       - "8080:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
-    restart: always
+    restart: unless-stopped
 
 
   influxdb:
@@ -108,6 +115,7 @@ services:
     container_name: influxdb
     ports:
       - "8086:8086"
+    restart: unless-stopped
     environment:
       - TZ=${TZ}
       - DOCKER_INFLUXDB_INIT_MODE=${DOCKER_INFLUXDB_INIT_MODE}
@@ -147,6 +155,7 @@ services:
       - LOGGING_LEVEL=${LOGGING_LEVEL}
       - SEND_TO_API=${SEND_TO_API}
     entrypoint: ./entrypoint.sh
+    restart: unless-stopped
     volumes:
       - ./mqtt_client:/app
     depends_on:
@@ -157,7 +166,7 @@ services:
   nginx_proxy_manager:
     image: 'jc21/nginx-proxy-manager:latest'
     container_name: nginx_proxy_manager
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"       # HTTP
       - "81:81"       # Web UI
@@ -186,10 +195,56 @@ services:
       - ./grafana/provisioning/dashboards:/var/lib/grafana/dashboards
       - ./grafana/grafana_startup.sh:/grafana_startup.sh
     entrypoint: [ "/bin/bash", "/grafana_startup.sh" ]
+    restart: unless-stopped
     depends_on:
       - influxdb
     networks:
       - app_network
+
+  faceid_server:
+    build: ./auth_server
+    ports:
+      - "8181:8080"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TOKEN_EXPIRATION: ${TOKEN_EXPIRATION}
+    restart: unless-stopped
+    volumes:
+      - ./images:/images
+    networks:
+      - app_network
+
+  postgres:
+    build: ./Postgre
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    restart: unless-stopped
+    ports:
+      - "5432:5432" # Port pro přístup k databázi
+    volumes:
+      - postgres-data:/var/lib/postgresql/data # Persistování dat
+    networks:
+      - app_network
+
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      - postgres
+      - influxdb
+    networks:
+      - app_network
+
+
 
 networks:
   app_network:
@@ -204,6 +259,7 @@ volumes:
     driver: local
   uptime-kuma-data:
     driver: local
+  postgres-data:
 
 
 

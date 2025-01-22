@@ -13,3 +13,5 @@ requests
 tqdm
 redis
 ujson
+psycopg2-binary
+bcrypt

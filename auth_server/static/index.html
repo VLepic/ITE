@@ -1,0 +1,47 @@
+ <!doctype html>
+<html>
+<head>
+    <title>Take Picture Using WebRTC</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="main.css" type="text/css" media="all">
+    <script src="capture.js"></script>
+</head>
+<body>
+    <div class="canvas" id="particles-js"></div>
+    <div class="contentarea">
+        <h1 class="title">Login using faceID or password</h1>
+        <div class="camera">
+            <video id="video">Video stream not available.</video>
+            <canvas id="canvas"></canvas>
+        </div>
+        <div class="buttons">
+            <button id="recognizebutton">Login using faceID</button>
+            <button id="loginbutton">Login Using Password</button>
+            <a href="register.html">Register</a>
+        </div>
+        <form class="login-form" id="login-form">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+            <button id="submit-login">Submit</button>
+        </form>
+        <p id="results"></p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script>
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 100 },
+                color: { value: '#ffffff' },
+                shape: { type: 'circle' },
+                opacity: { value: 0.5 },
+                size: { value: 1 },
+                move: { enable: true, speed: 1 }
+            },
+            interactivity: { events: { onhover: { enable: false, mode: 'repulse' } } },
+        });
+    </script>
+</body>
+</html>
+
+

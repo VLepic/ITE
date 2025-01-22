@@ -1,0 +1,7 @@
+numpy
+opencv-python
+tornado
+imutils
+scikit-learn
+psycopg2-binary
+bcrypt

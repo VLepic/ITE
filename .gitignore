@@ -7,3 +7,5 @@
 /influxdb_2_api_sync/sync_config.json
 /influxdb_2_api_sync/UUIDs.json
 /mqtt_client/UUIDs.json
+/auth_server/faceid/dataset/
+/auth_server/faceid/images/

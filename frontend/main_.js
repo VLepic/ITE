@@ -459,74 +459,73 @@ async function make_chart(wrapper , type = "temperature"){
 
 
 
-    if(teamName == "pink"){
+    if (teamName == "pink") {
 
-        async function get_alerts(){
-            url = `https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/getboundaries/${type}`
-            let alerts
-            await fetch(url).then(function(response) {
-                return response.json();
-            }).then(function(data) {
-                // console.log(data);
-                alerts = data
-            }).catch(function(err) {
-                console.log('Fetch Error :-S', err);
-            });
-            return alerts
+    async function get_alerts() {
+        const url = `https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/getboundaries/${type}`;
+        let alerts;
+        try {
+            const response = await fetch(url);
+            alerts = await response.json();
+        } catch (err) {
+            console.error("Fetch Error:", err);
+        }
+        return alerts;
+    }
+
+    await get_alerts().then(function (alerts) {
+        // Retrieve token from the URL
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+
+        // Generate UI based on token presence
+        let inputFields = `
+            <p>Limity upozornění:</p>
+            <span style="display: inline-block;">
+                <p>Max: <input class="dial" type="number" id="max" value="${alerts.highValue}"> ${units[type]}</p>
+                <p>Min: <input class="dial" type="number" id="min" value="${alerts.lowValue}"> ${units[type]}</p>
+        `;
+
+        if (!token) {
+            inputFields += `<p>Heslo: <input class="dial" type="password" id="pass" value=""></p>`;
         }
 
-        await get_alerts().then( function(alerts) {
+        inputFields += `<button style="margin-top:10px; margin-left:10px" id="submit">Nastavit</button>
+            </span>
+            <br>`;
 
+        wrapper.innerHTML = wrapper.innerHTML.concat(inputFields);
 
-            wrapper.innerHTML = wrapper.innerHTML.concat(`
-                <p>Limity upozornění:</p>
-                <span style="display : inline-block;" >
-                    <p>Max: <input class="dial" type="number" id="max" value="${alerts.highValue}"> ${units[type]} </p>
-                    <p>Min: <input class="dial" type="number" id="min" value="${alerts.lowValue}"> ${units[type]} </p>
-                    <p>Heslo: <input class="dial" type="password" id="pass" value=""> </p>
-                    <button style="margin-top:10px; margin-left:10px" id="submit" >Nastavit</button>
-                </span>
-                
-                <br>
-                `)
+        // Add event listener for submission
+        wrapper.querySelector("#submit").addEventListener("click", async function () {
+            const high = wrapper.querySelector("#max").value;
+            const low = wrapper.querySelector("#min").value;
 
-            wrapper.querySelector("#submit").addEventListener("click" , async function(){
+            let passOrToken = token || wrapper.querySelector("#pass").value;
 
-                // console.log("press")
-                const high = wrapper.querySelector("#max").value
-                const low = wrapper.querySelector("#min").value
-                const pass = wrapper.querySelector("#pass").value
-
-                await fetch(`https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/changeboundaries/${type}?login=pink&password=${pass}&min_value=${low}&max_value=${high}`, {
-                    method: 'PUT',
+            try {
+                const response = await fetch(`https://ite-alerts.vaclavlepic.com/aimtecapi/alerts/changeboundaries/${type}?login=pink&password=${passOrToken}&min_value=${low}&max_value=${high}`, {
+                    method: "PUT",
                     headers: {
-
-                      'Content-type': 'application/json'
+                        "Content-type": "application/json",
                     },
-                  }).then( function (response) {
-                    // console.log(response)
+                });
 
-                    if( response.ok == true ){
-                        window.alert(`Meze pro ${type} byly změněny.`)
-                        wrapper.innerHTML = ""
-                        make_chart(wrapper , type)
-                    }else{
-                        window.alert(`Nesprávný vstup.`)
-                    }
+                if (response.ok) {
+                    window.alert(`Meze pro ${type} byly změněny.`);
+                    wrapper.innerHTML = "";
+                    make_chart(wrapper, type);
+                } else {
+                    window.alert(`Nesprávný vstup.`);
+                }
+            } catch (err) {
+                console.error("Error during fetch:", err);
+                window.alert("Došlo k chybě při změně mezí.");
+            }
+        });
+    });
+}
 
-                  } );
-
-
-
-            } )
-
-
-        } )
-
-
-
-
-    }
 
 
 

@@ -5,6 +5,9 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import eventlet
 import os
+import psycopg2
+import secrets
+import os
 from datetime import datetime
 import ujson
 from approutes.Aimtec import *

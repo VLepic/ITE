@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Take Picture Using WebRTC</title>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="register.css" type="text/css" media="all">
+    </head>
+
+    <body>
+        <div class="canvas" id="particles-js"></div>
+
+
+        <div id="topmenu">
+            <nav id="menu-left">
+                <ul>
+                    <li><a href="index.html">BACK</a></li>
+                    <li><h1 >NEW USER REGISTRATION</h1></li>
+                </ul>
+            </nav>
+        </div>
+
+        <div class="registerbox">
+            <div class="contentarea">
+
+                <form class="login-form" id="login-form">
+                    <input type="text" id="username" placeholder="Username" required>
+                    <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+                    <input type="text" id="firstname" placeholder="First Name" autocomplete="first-name" required>
+                    <input type="text" id="lastname" placeholder="Last Name" autocomplete="last-name" required>
+                    <button id="submit-login">Submit</button>
+                </form>
+                <p id="results"></p>
+            </div>
+        </div>
+
+
+    </body>
+        <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+        <script src="register.js"></script>
+
+        <script>
+            particlesJS('particles-js', {
+                particles: {
+                    number: { value: 100 },
+                    color: { value: '#ffffff' },
+                    shape: { type: 'circle' },
+                    opacity: { value: 0.5 },
+                    size: { value: 1 },
+                    move: { enable: true, speed: 1 }
+                },
+                interactivity: { events: { onhover: { enable: false, mode: 'repulse' } } },
+            });
+        </script>
+</html>

@@ -1,0 +1,159 @@
+:root {
+    --background-end-rgb: 0, 0, 45;
+    --background-start-rgb: 125, 75, 50;
+}
+
+html{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 150%;
+    background: linear-gradient(
+        to bottom,
+        transparent,
+        rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+    background-size: cover;
+}
+
+.canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 150%;
+    z-index: -100;
+}
+
+#topmenu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: fit-content;
+    background-color: rgba(0, 0, 0, 0.8); /* White background */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add shadow */
+    z-index: 1000;
+}
+
+#menu-left {
+    display: flex;
+    align-items: center;
+}
+
+#menu-left ul {
+    list-style: none;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 5rem;
+    padding-left: 2rem;
+    color: white;
+}
+
+#menu-left ul li {
+    display: inline;
+}
+
+
+#menu-left ul li a {
+    text-decoration: none;
+    color: black;
+    font-weight: bold;
+    font-size: 16px;
+    transition: color 0.3s;
+    padding: 1rem;
+    background: white;
+    border-radius: 10px;
+}
+
+#menu-left ul li a:hover {
+    color: white; /* Highlight color on hover */
+    background: red;
+    cursor: pointer;
+}
+
+#change-password {
+    margin: 2rem auto;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    width: 50%;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+#change-password h2 {
+    color: black;
+    margin-bottom: 1rem;
+}
+
+#change-password form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+#change-password input {
+    width: 80%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#change-password button {
+    padding: 0.5rem 2rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#change-password button:hover {
+    background-color: #0056b3;
+}
+
+#change-password-status {
+    margin-top: 1rem;
+    color: red;
+    font-weight: bold;
+}
+
+.maincontainer{
+    width: 100%;
+    display: flex;
+    height: fit-content;
+    flex-direction: column;
+    align-content: center;
+    align-items: center;
+
+}
+
+#embedded-container{
+    width: 90vw;
+    height: 90vh;
+}
+
+.embedded{
+    width: 90%;
+    height: 100%;
+    margin-top: 3%;
+    flex-direction: column;
+    flex-wrap: wrap;
+
+}
+
+
+
+
+
+
+

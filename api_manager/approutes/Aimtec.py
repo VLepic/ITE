@@ -13,6 +13,9 @@ import logging
 import requests
 from typing import Dict, List, Optional
 from tqdm import tqdm
+import os
+import psycopg2
+import secrets
 
 class alert_manager:
 
@@ -357,6 +360,17 @@ def change_boundaries_route(app):
 
     @app.route('/aimtecapi/alerts/changeboundaries/<sensor_type>', methods=['PUT'])
     def change_boundaries(sensor_type):
+        import os
+        AIMTECPASS = os.environ.get("AIMTEC_PASSWORD")
+        conn = psycopg2.connect(
+            dbname=os.environ.get("POSTGRES_DB"),
+            user=os.environ.get("POSTGRES_USER"),
+            password=os.environ.get("POSTGRES_PASSWORD"),
+            host=os.environ.get("POSTGRES_HOST", "postgres"),
+            port=5432
+        )
+        cursor = conn.cursor()
+
         logging.info(f'PUT /aimtecapi/alerts/changeboundaries/{sensor_type}')
         if sensor_type not in ["temperature", "humidity", "illumination"]:
             return jsonify({'error': 'Invalid sensor type'}), 400
@@ -376,6 +390,12 @@ def change_boundaries_route(app):
         sensorUUID_TEMPERATURE = "27f05ba8-f6fa-4210-8dba-8281d5124e3c"
         sensorUUID_HUMIDITY = "2772ce03-2fe3-4a42-95f6-f9af10ebe6ce"
         sensorUUID_ILLUMINATION = "fd324f1a-c9c9-49d0-9ecf-c59404710bbf"
+
+        cursor.execute("SELECT 1 FROM login_tokens WHERE logintoken = %s LIMIT 1;", (AIMTEC_PASSWORD,))
+        token_present = cursor.fetchone() is not None
+
+        if(token_present):
+            AIMTEC_PASSWORD = AIMTECPASS
 
         api = ITE_2024_API(BASE_URL, AIMTEC_USERNAME, AIMTEC_PASSWORD)
         alert_m = alert_manager(AIMTEC_USERNAME, AIMTEC_PASSWORD, BASE_URL, sensorUUID_TEMPERATURE, sensorUUID_HUMIDITY, sensorUUID_ILLUMINATION)

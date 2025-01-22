@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Take Picture Using WebRTC</title>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="logged.css" type="text/css" media="all">
+    </head>
+
+    <body>
+        <div class="canvas" id="particles-js"></div>
+        <div class="maincontainer">
+
+            <div id="topmenu">
+                <nav id="menu-left">
+                    <ul>
+                        <li><a class="menua" href="index.html">LOGOUT</a></li>
+                        <li><h1 id="username">Logged in as:</h1></li>
+                        <li><h1 id="last_login_time">Last logged in at:</h1></li>
+                        <li><a href="#change-password">change password</a></li>
+                    </ul>
+                </nav>
+            </div>
+
+
+            <div class="embedded">
+                <div id="embedded-container">
+                    <iframe
+                        src=""
+                        id="embedded-site"
+                        title="Embedded Website"
+                        width="100%"
+                        height="100%"
+                        frameborder="0"
+                        style="border: 1px solid #ccc; border-radius: 10px;"
+                        allowfullscreen>
+                    </iframe>
+                </div>
+
+            </div>
+
+            <div id="change-password">
+                <h2>Change Password</h2>
+                <form id="change-password-form">
+                    <input type="password" id="old-password" placeholder="Old Password" required>
+                    <input type="password" id="new-password" placeholder="New Password" required>
+                    <button type="submit">Change Password</button>
+                </form>
+                <p id="change-password-status"></p>
+            </div>
+        </div>
+
+
+    </body>
+        <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+        <script src="logged.js"></script>
+
+        <script>
+            particlesJS('particles-js', {
+                particles: {
+                    number: { value: 100 },
+                    color: { value: '#ffffff' },
+                    shape: { type: 'circle' },
+                    opacity: { value: 0.5 },
+                    size: { value: 1 },
+                    move: { enable: true, speed: 1 }
+                },
+                interactivity: { events: { onhover: { enable: false, mode: 'repulse' } } },
+            });
+        </script>
+</html>

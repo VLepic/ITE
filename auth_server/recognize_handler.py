@@ -74,7 +74,7 @@ class RecognizeImageHandler(tornado.web.RequestHandler):
             confidence = detections[0, 0, i, 2]
 
             # filter out weak detections
-            if confidence > 0.5:
+            if confidence > 0.6:
                 # compute the (x, y)-coordinates of the bounding box for the
                 # face
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
@@ -100,6 +100,8 @@ class RecognizeImageHandler(tornado.web.RequestHandler):
                 name = le.classes_[j]
                 userid = username = token_id = logintoken = created_at = expires_at = None
                 TOKEN_EXPIRATION_MINUTES = os.environ.get("TOKEN_EXPIRATION", 30)
+                if proba < 0.69:
+                    name = "unknown"
                 if name != "unknown":
                     conn = psycopg2.connect(
                         dbname=os.environ.get("POSTGRES_DB"),

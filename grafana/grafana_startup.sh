@@ -37,24 +37,6 @@ providers:
       path: /etc/grafana/provisioning/dashboards/ite.json
 EOF
 
-# Generate redundant datasources configuration (optional)
-cat <<EOF > /etc/grafana/provisioning/datasources/datasources.yml
-apiVersion: 1
-
-datasources:
-  - name: InfluxDB
-    type: influxdb
-    url: http://influxdb:8086
-    access: proxy
-    isDefault: true
-    jsonData:
-      organization: ${DOCKER_INFLUXDB_INIT_ORG}
-      defaultBucket: ${DOCKER_INFLUXDB_INIT_BUCKET}
-      version: Flux
-    secureJsonData:
-      token: ${DOCKER_INFLUXDB_INIT_GRAFANA_TOKEN}
-EOF
-
 # Start Grafana
 exec /run.sh
 
